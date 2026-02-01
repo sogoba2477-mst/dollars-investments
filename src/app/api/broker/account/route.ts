@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { alpaca } from "@/lib/broker/alpaca";
+import { getAlpacaClient } from "@/lib/broker/alpaca";
 
 export async function GET() {
+  const alpaca = getAlpacaClient();
   const account = await alpaca.getAccount();
   return NextResponse.json({
     id: account.id,

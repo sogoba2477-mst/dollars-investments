@@ -1,13 +1,18 @@
 import Alpaca from "@alpacahq/alpaca-trade-api";
 
-function required(name: string, value?: string) {
-  if (!value) throw new Error(`Missing env var: ${name}`);
-  return value;
-}
+export function getAlpacaClient() {
+  const keyId = process.env.ALPACA_API_KEY;
+  const secretKey = process.env.ALPACA_API_SECRET;
+  const baseUrl = process.env.ALPACA_BASE_URL ?? "https://paper-api.alpaca.markets";
 
-export const alpaca = new Alpaca({
-  keyId: required("ALPACA_API_KEY", process.env.ALPACA_API_KEY),
-  secretKey: required("ALPACA_API_SECRET", process.env.ALPACA_API_SECRET),
-  paper: true,
-  baseUrl: required("ALPACA_BASE_URL", process.env.ALPACA_BASE_URL), // SANS /v2
-});
+  if (!keyId || !secretKey) {
+    throw new Error("Alpaca env vars missing: ALPACA_API_KEY / ALPACA_API_SECRET");
+  }
+
+  return new Alpaca({
+    keyId,
+    secretKey,
+    paper: true,
+    baseUrl, // IMPORTANT: sans /v2
+  });
+}
