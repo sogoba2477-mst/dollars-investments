@@ -1,10 +1,20 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ReactNode } from "react";
+import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
 
 import { Button } from "@/components/ui/button";
+import { authOptions } from "@/lib/auth";
 
-export default function AppLayout({ children }: { children: ReactNode }) {
+export default async function AppLayout({ children }: { children: ReactNode }) {
+  const session = await getServerSession(authOptions);
+
+  // Protect /app without Edge middleware
+  if (!session) {
+    redirect("/login");
+  }
+
   return (
     <div className="min-h-screen text-white">
       {/* Background */}
@@ -24,7 +34,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-20 border-b border-white/10 bg-black/30 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <Link href="/" className="flex items-center gap-3">
-            {/* Logo */}
             <Image
               src="/logo-dollars.png"
               alt="dollars.investments"
@@ -62,10 +71,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      {/* Page container */}
-      <main className="mx-auto max-w-6xl px-4 py-10">
-        {children}
-      </main>
+      <main className="mx-auto max-w-6xl px-4 py-10">{children}</main>
 
       <footer className="mx-auto max-w-6xl px-4 pb-10 text-xs text-white/40">
         © 2026 dollars.investments — Paper trading sandbox
@@ -74,13 +80,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   );
 }
 
-function NavLink({
-  href,
-  children,
-}: {
-  href: string;
-  children: ReactNode;
-}) {
+function NavLink({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link
       href={href}
