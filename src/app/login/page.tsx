@@ -78,7 +78,7 @@ export default function LoginPage() {
 
           <div className="mt-6 space-y-3">
             <Button
-              className="w-full rounded-2xl bg-white text-black hover:bg-white/90"
+              className="w-full rounded-2xl bg-white text-black hover:bg-white/90 transition"
               onClick={() => signIn("google", { callbackUrl: "/app" })}
             >
               Continue with Google
@@ -96,19 +96,18 @@ export default function LoginPage() {
                   />
                 </div>
 
+                {/* GLOW ON HOVER */}
                 <Button
                   type="submit"
                   disabled={!email || loadingEmail}
-                  className="
-                    w-full rounded-2xl
-                    bg-white/10 text-white
-                    border border-white/15
-                    transition
-                    hover:bg-white/20 hover:border-white/30 hover:shadow-[0_0_30px_rgba(255,255,255,0.18)]
-                    active:scale-[0.99]
-                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40
-                    disabled:opacity-50 disabled:hover:bg-white/10 disabled:hover:shadow-none
-                  "
+                  className={[
+                    "w-full rounded-2xl bg-white text-black",
+                    "transition-all duration-200",
+                    "hover:bg-white/95 hover:-translate-y-[1px]",
+                    "hover:shadow-[0_0_0_1px_rgba(255,255,255,0.35),0_10px_35px_rgba(255,255,255,0.12)]",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-0",
+                    "disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none",
+                  ].join(" ")}
                 >
                   {loadingEmail ? "Sending…" : "Send magic link"}
                 </Button>
