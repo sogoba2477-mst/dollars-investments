@@ -66,7 +66,9 @@ export default function LoginPage() {
 
       <main className="mx-auto max-w-6xl px-4 py-12">
         <div className="mx-auto max-w-md rounded-3xl border border-white/10 bg-white/5 p-7 backdrop-blur-xl">
-          <div className="text-xs uppercase tracking-widest text-white/50">Login</div>
+          <div className="text-xs uppercase tracking-widest text-white/50">
+            Login
+          </div>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">
             Sign in
           </h1>
@@ -97,7 +99,16 @@ export default function LoginPage() {
                 <Button
                   type="submit"
                   disabled={!email || loadingEmail}
-                  className="w-full rounded-2xl bg-white text-black hover:bg-white/90 disabled:opacity-50"
+                  className="
+                    w-full rounded-2xl
+                    bg-white/10 text-white
+                    border border-white/15
+                    transition
+                    hover:bg-white/20 hover:border-white/30 hover:shadow-[0_0_30px_rgba(255,255,255,0.18)]
+                    active:scale-[0.99]
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40
+                    disabled:opacity-50 disabled:hover:bg-white/10 disabled:hover:shadow-none
+                  "
                 >
                   {loadingEmail ? "Sending…" : "Send magic link"}
                 </Button>
@@ -110,7 +121,10 @@ export default function LoginPage() {
 
             <div className="text-sm text-white/70">
               No account?{" "}
-              <Link href="/signup" className="text-white underline underline-offset-4">
+              <Link
+                href="/signup"
+                className="text-white underline underline-offset-4"
+              >
                 Create one
               </Link>
             </div>
