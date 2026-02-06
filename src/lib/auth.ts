@@ -20,10 +20,9 @@ function hasEmailEnv() {
   );
 }
 
-const isProd = process.env.NODE_ENV === "production";
-
-// Si tu veux absolument éviter les problèmes www/apex :
-const COOKIE_DOMAIN = isProd ? ".dollars.investments" : undefined;
+// Cookies partagés entre www et apex
+const COOKIE_DOMAIN =
+  process.env.NODE_ENV === "production" ? ".dollars.investments" : undefined;
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -31,49 +30,20 @@ export const authOptions: NextAuthOptions = {
   // IMPORTANT en prod
   secret: mustEnv("NEXTAUTH_SECRET"),
 
-  // Session stockée en DB (Prisma)
-  session: { strategy: "database" },
+  // Sur Vercel/proxy, aide NextAuth à faire confiance au host
+  trustHost: true,
 
-  // Cookies partagés sur le domaine (évite state mismatch)
-  cookies: {
-    sessionToken: {
-      name: isProd ? "__Secure-next-auth.session-token" : "next-auth.session-token",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: isProd,
-        domain: COOKIE_DOMAIN,
-      },
-    },
-    callbackUrl: {
-      name: isProd ? "__Secure-next-auth.callback-url" : "next-auth.callback-url",
-      options: {
-        sameSite: "lax",
-        path: "/",
-        secure: isProd,
-        domain: COOKIE_DOMAIN,
-      },
-    },
-    csrfToken: {
-      name: isProd ? "__Host-next-auth.csrf-token" : "next-auth.csrf-token",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: isProd,
-        // __Host- cookies ne doivent PAS avoir de domain, donc on ne met pas domain ici
-      },
-    },
-  },
+  // DB sessions (ok)
+  session: { strategy: "database" },
 
   providers: [
     GoogleProvider({
       clientId: mustEnv("GOOGLE_CLIENT_ID"),
       clientSecret: mustEnv("GOOGLE_CLIENT_SECRET"),
+      // Optionnel mais utile quand tu as plusieurs environnements
+      allowDangerousEmailAccountLinking: false,
     }),
 
-    // Email provider seulement si SMTP est configuré
     ...(hasEmailEnv()
       ? [
           EmailProvider({
@@ -91,21 +61,86 @@ export const authOptions: NextAuthOptions = {
       : []),
   ],
 
-  pages: {
-    signIn: "/login",
+  pages: { signIn: "/login" },
+
+  // ✅ Clé: cookies sur le domaine parent (www + apex)
+  cookies: {
+    sessionToken: {
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Secure-next-auth.session-token"
+          : "next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        domain: COOKIE_DOMAIN,
+      },
+    },
+    callbackUrl: {
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Secure-next-auth.callback-url"
+          : "next-auth.callback-url",
+      options: {
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        domain: COOKIE_DOMAIN,
+      },
+    },
+    csrfToken: {
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Host-next-auth.csrf-token"
+          : "next-auth.csrf-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        // ⚠️ __Host- cookie ne doit PAS avoir domain en prod
+        ...(process.env.NODE_ENV === "production" ? {} : { domain: COOKIE_DOMAIN }),
+      },
+    },
+    state: {
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Secure-next-auth.state"
+          : "next-auth.state",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        domain: COOKIE_DOMAIN,
+      },
+    },
+    nonce: {
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Secure-next-auth.nonce"
+          : "next-auth.nonce",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        domain: COOKIE_DOMAIN,
+      },
+    },
   },
 
   callbacks: {
     async redirect({ url, baseUrl }) {
-      // Autorise seulement les redirects internes
+      // Empêche les redirects vers un autre domaine
       if (url.startsWith("/")) return `${baseUrl}${url}`;
-      try {
-        const u = new URL(url);
-        if (u.origin === baseUrl) return url;
-      } catch {
-        // ignore
-      }
+      if (new URL(url).origin === baseUrl) return url;
       return baseUrl;
     },
   },
+
+  // Optionnel: active si tu veux voir plus de logs côté Vercel
+  // debug: process.env.NODE_ENV !== "production",
 };
