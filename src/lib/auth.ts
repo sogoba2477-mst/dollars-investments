@@ -20,30 +20,24 @@ function hasEmailEnv() {
   );
 }
 
-// Cookies partagés entre www et apex
-const COOKIE_DOMAIN =
-  process.env.NODE_ENV === "production" ? ".dollars.investments" : undefined;
+const isProd = process.env.NODE_ENV === "production";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
 
-  // IMPORTANT en prod
+  // ✅ Obligatoire en prod
   secret: mustEnv("NEXTAUTH_SECRET"),
 
-  // Sur Vercel/proxy, aide NextAuth à faire confiance au host
-  trustHost: true,
-
-  // DB sessions (ok)
+  // ✅ Stockage session en DB
   session: { strategy: "database" },
 
   providers: [
     GoogleProvider({
       clientId: mustEnv("GOOGLE_CLIENT_ID"),
       clientSecret: mustEnv("GOOGLE_CLIENT_SECRET"),
-      // Optionnel mais utile quand tu as plusieurs environnements
-      allowDangerousEmailAccountLinking: false,
     }),
 
+    // ✅ Email provider seulement si SMTP est configuré
     ...(hasEmailEnv()
       ? [
           EmailProvider({
@@ -61,86 +55,32 @@ export const authOptions: NextAuthOptions = {
       : []),
   ],
 
-  pages: { signIn: "/login" },
-
-  // ✅ Clé: cookies sur le domaine parent (www + apex)
-  cookies: {
-    sessionToken: {
-      name:
-        process.env.NODE_ENV === "production"
-          ? "__Secure-next-auth.session-token"
-          : "next-auth.session-token",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-        domain: COOKIE_DOMAIN,
-      },
-    },
-    callbackUrl: {
-      name:
-        process.env.NODE_ENV === "production"
-          ? "__Secure-next-auth.callback-url"
-          : "next-auth.callback-url",
-      options: {
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-        domain: COOKIE_DOMAIN,
-      },
-    },
-    csrfToken: {
-      name:
-        process.env.NODE_ENV === "production"
-          ? "__Host-next-auth.csrf-token"
-          : "next-auth.csrf-token",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-        // ⚠️ __Host- cookie ne doit PAS avoir domain en prod
-        ...(process.env.NODE_ENV === "production" ? {} : { domain: COOKIE_DOMAIN }),
-      },
-    },
-    state: {
-      name:
-        process.env.NODE_ENV === "production"
-          ? "__Secure-next-auth.state"
-          : "next-auth.state",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-        domain: COOKIE_DOMAIN,
-      },
-    },
-    nonce: {
-      name:
-        process.env.NODE_ENV === "production"
-          ? "__Secure-next-auth.nonce"
-          : "next-auth.nonce",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-        domain: COOKIE_DOMAIN,
-      },
-    },
+  pages: {
+    signIn: "/login",
   },
 
   callbacks: {
     async redirect({ url, baseUrl }) {
-      // Empêche les redirects vers un autre domaine
+      // ✅ Sécurise les redirects (évite d'aller sur un autre domaine)
       if (url.startsWith("/")) return `${baseUrl}${url}`;
-      if (new URL(url).origin === baseUrl) return url;
+      try {
+        const u = new URL(url);
+        if (u.origin === baseUrl) return url;
+      } catch {}
       return baseUrl;
     },
   },
 
-  // Optionnel: active si tu veux voir plus de logs côté Vercel
-  // debug: process.env.NODE_ENV !== "production",
+  // ✅ Logging utile (tu peux enlever après)
+  logger: {
+    error(code, metadata) {
+      console.error("[next-auth][error]", code, metadata);
+    },
+    warn(code) {
+      console.warn("[next-auth][warn]", code);
+    },
+    debug(code, metadata) {
+      if (!isProd) console.log("[next-auth][debug]", code, metadata);
+    },
+  },
 };
