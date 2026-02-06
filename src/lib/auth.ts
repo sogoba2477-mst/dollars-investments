@@ -23,11 +23,44 @@ function hasEmailEnv() {
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
 
-  // ✅ IMPORTANT en prod
+  // 🔐 Secret obligatoire
   secret: mustEnv("NEXTAUTH_SECRET"),
 
-  // ✅ Session stockée en DB (Prisma)
+  // Session stockée en DB
   session: { strategy: "database" },
+
+  // ✅ Cookies sécurisés + domaine racine (évite state mismatch)
+  useSecureCookies: true,
+  cookies: {
+    sessionToken: {
+      name: "__Secure-next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: true,
+        domain: ".dollars.investments",
+      },
+    },
+    callbackUrl: {
+      name: "__Secure-next-auth.callback-url",
+      options: {
+        sameSite: "lax",
+        path: "/",
+        secure: true,
+        domain: ".dollars.investments",
+      },
+    },
+    csrfToken: {
+      name: "__Host-next-auth.csrf-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: true,
+      },
+    },
+  },
 
   providers: [
     GoogleProvider({
@@ -35,7 +68,6 @@ export const authOptions: NextAuthOptions = {
       clientSecret: mustEnv("GOOGLE_CLIENT_SECRET"),
     }),
 
-    // ✅ Email provider seulement si SMTP est configuré
     ...(hasEmailEnv()
       ? [
           EmailProvider({
@@ -59,7 +91,6 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async redirect({ url, baseUrl }) {
-      // Empêche les redirects vers un autre domaine
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       if (new URL(url).origin === baseUrl) return url;
       return baseUrl;
