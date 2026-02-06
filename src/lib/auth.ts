@@ -25,19 +25,20 @@ const isProd = process.env.NODE_ENV === "production";
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
 
-  // ✅ Obligatoire en prod
+  // obligatoire en prod
   secret: mustEnv("NEXTAUTH_SECRET"),
 
-  // ✅ Stockage session en DB
+  // sessions en DB
   session: { strategy: "database" },
 
   providers: [
     GoogleProvider({
       clientId: mustEnv("GOOGLE_CLIENT_ID"),
       clientSecret: mustEnv("GOOGLE_CLIENT_SECRET"),
+      // IMPORTANT: force à rester sur HTTPS en prod (souvent aide)
+      authorization: { params: { prompt: "select_account" } },
     }),
 
-    // ✅ Email provider seulement si SMTP est configuré
     ...(hasEmailEnv()
       ? [
           EmailProvider({
@@ -61,7 +62,7 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async redirect({ url, baseUrl }) {
-      // ✅ Sécurise les redirects (évite d'aller sur un autre domaine)
+      // En prod, baseUrl vient de NEXTAUTH_URL (donc dollars.investments)
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       try {
         const u = new URL(url);
@@ -71,16 +72,6 @@ export const authOptions: NextAuthOptions = {
     },
   },
 
-  // ✅ Logging utile (tu peux enlever après)
-  logger: {
-    error(code, metadata) {
-      console.error("[next-auth][error]", code, metadata);
-    },
-    warn(code) {
-      console.warn("[next-auth][warn]", code);
-    },
-    debug(code, metadata) {
-      if (!isProd) console.log("[next-auth][debug]", code, metadata);
-    },
-  },
+  // utile pour diagnostiquer en prod (tu peux mettre false plus tard)
+  debug: !isProd,
 };
