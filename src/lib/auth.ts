@@ -25,12 +25,12 @@ const isProd = process.env.NODE_ENV === "production";
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
 
-  // obligatoire (surtout en prod)
+  // REQUIRED in production
   secret: mustEnv("NEXTAUTH_SECRET"),
 
   session: { strategy: "database" },
 
-  // IMPORTANT: force cookies sécurisés en prod
+  // Let NextAuth handle secure cookies in prod
   useSecureCookies: isProd,
 
   providers: [
@@ -56,13 +56,11 @@ export const authOptions: NextAuthOptions = {
       : []),
   ],
 
-  pages: {
-    signIn: "/login",
-  },
+  pages: { signIn: "/login" },
 
   callbacks: {
     async redirect({ url, baseUrl }) {
-      // baseUrl vient de NEXTAUTH_URL (donc dollars.investments)
+      // Always keep redirects on same origin
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       try {
         const u = new URL(url);
@@ -71,4 +69,7 @@ export const authOptions: NextAuthOptions = {
       return baseUrl;
     },
   },
+
+  // (temp) helps you see errors in vercel logs
+  debug: true,
 };
