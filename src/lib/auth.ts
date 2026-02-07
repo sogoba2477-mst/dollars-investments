@@ -21,17 +21,17 @@ function hasEmailEnv() {
 }
 
 const isProd = process.env.NODE_ENV === "production";
+const canonicalUrl = isProd
+  ? "https://dollars.investments"
+  : "http://localhost:3000";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
 
-  // REQUIRED in production
+  // Obligatoire en prod: stable et identique partout
   secret: mustEnv("NEXTAUTH_SECRET"),
 
   session: { strategy: "database" },
-
-  // Let NextAuth handle secure cookies in prod
-  useSecureCookies: isProd,
 
   providers: [
     GoogleProvider({
@@ -56,20 +56,24 @@ export const authOptions: NextAuthOptions = {
       : []),
   ],
 
-  pages: { signIn: "/login" },
+  pages: {
+    signIn: "/login",
+  },
 
+  // Force le domaine canonique uniquement au moment des redirects
   callbacks: {
     async redirect({ url, baseUrl }) {
-      // Always keep redirects on same origin
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      const base = isProd ? canonicalUrl : baseUrl;
+
+      if (url.startsWith("/")) return `${base}${url}`;
       try {
         const u = new URL(url);
-        if (u.origin === baseUrl) return url;
+        if (u.origin === base) return url;
       } catch {}
-      return baseUrl;
+      return base;
     },
   },
 
-  // (temp) helps you see errors in vercel logs
+  // Active temporairement pour voir plus de logs dans Vercel
   debug: true,
 };

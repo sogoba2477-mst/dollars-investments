@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
   const host = req.headers.get("host") || "";
 
-  // Force www -> apex, mais sans toucher à /api/auth/* (OAuth)
+  // IMPORTANT: ne jamais interférer avec NextAuth
+  if (pathname.startsWith("/api/auth")) {
+    return NextResponse.next();
+  }
+
+  // Redirect www -> apex
   if (host.startsWith("www.")) {
     const url = req.nextUrl.clone();
     url.host = host.replace(/^www\./, "");
@@ -15,14 +21,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    // Applique le middleware partout SAUF :
-    // - Next.js assets
-    // - favicon/icon
-    // - NextAuth routes (OAuth dépend des cookies state/pkce/csrf)
-    // - Toute API (optionnel mais recommandé pour éviter surprises)
-    "/((?!api/auth|api/|_next|favicon.ico|icon.ico).*)",
-  ],
+  matcher: ["/((?!_next|favicon.ico|icon.ico).*)"],
 };
-
-
