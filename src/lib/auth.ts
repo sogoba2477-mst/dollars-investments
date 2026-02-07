@@ -21,22 +21,19 @@ function hasEmailEnv() {
 }
 
 const isProd = process.env.NODE_ENV === "production";
+const canonicalUrl = isProd ? "https://dollars.investments" : "http://localhost:3001";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
 
-  // obligatoire en prod
   secret: mustEnv("NEXTAUTH_SECRET"),
 
-  // sessions en DB
   session: { strategy: "database" },
 
   providers: [
     GoogleProvider({
       clientId: mustEnv("GOOGLE_CLIENT_ID"),
       clientSecret: mustEnv("GOOGLE_CLIENT_SECRET"),
-      // IMPORTANT: force à rester sur HTTPS en prod (souvent aide)
-      authorization: { params: { prompt: "select_account" } },
     }),
 
     ...(hasEmailEnv()
@@ -62,16 +59,18 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async redirect({ url, baseUrl }) {
-      // En prod, baseUrl vient de NEXTAUTH_URL (donc dollars.investments)
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      const base = isProd ? canonicalUrl : baseUrl;
+
+      // Autorise les redirects internes
+      if (url.startsWith("/")) return `${base}${url}`;
+
+      // Autorise uniquement le même origin
       try {
         const u = new URL(url);
-        if (u.origin === baseUrl) return url;
+        if (u.origin === base) return url;
       } catch {}
-      return baseUrl;
+
+      return base;
     },
   },
-
-  // utile pour diagnostiquer en prod (tu peux mettre false plus tard)
-  debug: !isProd,
 };
