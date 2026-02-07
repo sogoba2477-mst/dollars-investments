@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 
 function mustEnv(name: string) {
   const v = process.env[name];
-  if (!v) throw new Error(`Missing env var: ${name}`);
+  if (!v) throw news Error(`Missing env var: ${name}`);
   return v;
 }
 
