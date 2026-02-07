@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-  const host = req.headers.get("host") || "";
+const APEX = "dollars.investments";
 
-  // IMPORTANT: ne jamais interférer avec NextAuth
+export function middleware(req: NextRequest) {
+  const host = (req.headers.get("host") || "").toLowerCase();
+  const { pathname } = req.nextUrl;
+
+  // Ne jamais interférer avec NextAuth
   if (pathname.startsWith("/api/auth")) {
     return NextResponse.next();
   }
 
-  // Redirect www -> apex
-  if (host.startsWith("www.")) {
+  // Si ce n'est pas l'apex, redirige tout vers l'apex
+  // (inclut www. et aussi *.vercel.app)
+  if (host && host !== APEX) {
     const url = req.nextUrl.clone();
-    url.host = host.replace(/^www\./, "");
+    url.host = APEX;
     url.protocol = "https:";
     return NextResponse.redirect(url, 308);
   }
