@@ -99,7 +99,7 @@ export default async function AppHome() {
         <div className="rounded-2xl border p-5">
           <div className="text-sm font-medium">Activity</div>
           <div className="mt-2 text-sm text-muted-foreground">
-            {positionsCount} positions · {ordersCount} orders
+            {positionsCount} positions — {ordersCount} orders
           </div>
         </div>
       </div>

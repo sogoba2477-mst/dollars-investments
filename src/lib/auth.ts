@@ -11,19 +11,18 @@ function mustEnv(name: string) {
 }
 
 function hasEmailEnv() {
-  return Boolean(
-    process.env.EMAIL_SERVER_HOST &&
-      process.env.EMAIL_SERVER_PORT &&
-      process.env.EMAIL_SERVER_USER &&
-      process.env.EMAIL_SERVER_PASSWORD &&
-      process.env.EMAIL_FROM
+  return (
+    !!process.env.EMAIL_SERVER_HOST &&
+    !!process.env.EMAIL_SERVER_PORT &&
+    !!process.env.EMAIL_SERVER_USER &&
+    !!process.env.EMAIL_SERVER_PASSWORD &&
+    !!process.env.EMAIL_FROM
   );
 }
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
 
-  // Required in prod
   secret: mustEnv("NEXTAUTH_SECRET"),
 
   session: { strategy: "database" },
@@ -53,17 +52,5 @@ export const authOptions: NextAuthOptions = {
 
   pages: {
     signIn: "/login",
-  },
-
-  callbacks: {
-    async redirect({ url, baseUrl }) {
-      // only allow redirects within the same site
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
-      try {
-        const u = new URL(url);
-        if (u.origin === baseUrl) return url;
-      } catch {}
-      return baseUrl;
-    },
   },
 };
