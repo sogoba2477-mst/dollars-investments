@@ -10,14 +10,17 @@ type Order = {
   qty?: string | number;
   type?: string;
   status?: string;
-  submitted_at?: string;
+  createdAt?: string; // PaperOrder uses createdAt
+  filledPrice?: string | number | null;
 };
 
 function formatDate(d?: string) {
   if (!d) return "—";
   const date = new Date(d);
   if (Number.isNaN(date.getTime())) return "—";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(
+    date
+  );
 }
 
 type Toast = { type: "success" | "error"; title: string; message?: string } | null;
@@ -26,7 +29,7 @@ export default function TradePage() {
   const [symbol, setSymbol] = useState("AAPL");
   const [qty, setQty] = useState<number>(1);
   const [side, setSide] = useState<"buy" | "sell">("buy");
-  const [tif, setTif] = useState<"day" | "gtc">("day");
+  const [tif, setTif] = useState<"day" | "gtc">("day"); // gardé pour UI (pas utilisé en paper v1)
   const [loading, setLoading] = useState(false);
 
   const [orders, setOrders] = useState<Order[]>([]);
@@ -37,7 +40,7 @@ export default function TradePage() {
   async function loadOrders() {
     setLoadingOrders(true);
     try {
-      const res = await fetch("/api/broker/orders", { cache: "no-store" });
+      const res = await fetch("/api/paper/orders", { cache: "no-store" });
       const json = (await res.json()) as Order[];
       setOrders(Array.isArray(json) ? json : []);
     } catch {
@@ -63,15 +66,14 @@ export default function TradePage() {
     setToast(null);
 
     try {
-      const res = await fetch("/api/broker/orders", {
+      const res = await fetch("/api/paper/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           symbol,
           qty,
           side,
-          type: "market",
-          time_in_force: tif,
+          // paper v1 ignore tif/type; it’s always market
         }),
       });
 
@@ -81,7 +83,7 @@ export default function TradePage() {
         setToast({
           type: "error",
           title: "Order failed",
-          message: data?.error ?? `HTTP ${res.status}`,
+          message: data?.error ?? data?.message ?? `HTTP ${res.status}`,
         });
         return;
       }
@@ -89,10 +91,10 @@ export default function TradePage() {
       setToast({
         type: "success",
         title: "Order placed",
-        message: `${side.toUpperCase()} ${qty} ${symbol.toUpperCase()} (market)`,
+        message: `${side.toUpperCase()} ${qty} ${symbol.toUpperCase()} (paper market)`,
       });
 
-      await loadOrders(); // refresh orders after success
+      await loadOrders();
     } catch (e: any) {
       setToast({
         type: "error",
@@ -123,8 +125,12 @@ export default function TradePage() {
           </div>
           <style jsx>{`
             @keyframes shrink {
-              from { transform: translateX(0%); }
-              to { transform: translateX(-100%); }
+              from {
+                transform: translateX(0%);
+              }
+              to {
+                transform: translateX(-100%);
+              }
             }
           `}</style>
         </div>
@@ -134,11 +140,9 @@ export default function TradePage() {
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="text-xs uppercase tracking-widest text-white/50">Trade</div>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">
-            Market Order
-          </h1>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">Market Order</h1>
           <p className="mt-1 text-sm text-white/70">
-            Paper trading only — server-side execution.
+            Paper trading only — executed by <span className="text-white/80">Internal Paper Engine</span>.
           </p>
         </div>
 
@@ -151,7 +155,7 @@ export default function TradePage() {
             {loadingOrders ? "Refreshing…" : "Refresh Orders"}
           </Button>
           <a
-            href="/api/broker/orders"
+            href="/api/paper/orders"
             target="_blank"
             rel="noreferrer"
             className="rounded-2xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10"
@@ -194,7 +198,7 @@ export default function TradePage() {
             </select>
           </Field>
 
-          <Field label="Time in force">
+          <Field label="Time in force (UI only)">
             <select
               value={tif}
               onChange={(e) => setTif(e.target.value as any)}
@@ -207,7 +211,8 @@ export default function TradePage() {
 
           <div className="md:col-span-4 flex items-center justify-between gap-3">
             <div className="text-xs text-white/60">
-              Type: <span className="text-white/80">market</span> · Endpoint: Alpaca Paper
+              Type: <span className="text-white/80">market</span> · Engine:{" "}
+              <span className="text-white/80">Internal Paper Engine</span>
             </div>
 
             <Button
@@ -239,13 +244,14 @@ export default function TradePage() {
                 <th className="px-4 py-3">Qty</th>
                 <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Submitted</th>
+                <th className="px-4 py-3">Fill</th>
+                <th className="px-4 py-3">Created</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
               {orders.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-6 text-white/70" colSpan={6}>
+                  <td className="px-4 py-6 text-white/70" colSpan={7}>
                     No orders yet.
                   </td>
                 </tr>
@@ -255,9 +261,12 @@ export default function TradePage() {
                     <td className="px-4 py-3 text-white">{o.symbol ?? "—"}</td>
                     <td className="px-4 py-3 text-white/80">{o.side ?? "—"}</td>
                     <td className="px-4 py-3 text-white/80">{String(o.qty ?? "—")}</td>
-                    <td className="px-4 py-3 text-white/80">{o.type ?? "—"}</td>
+                    <td className="px-4 py-3 text-white/80">{o.type ?? "market"}</td>
                     <td className="px-4 py-3 text-white/80">{o.status ?? "—"}</td>
-                    <td className="px-4 py-3 text-white/70">{formatDate(o.submitted_at)}</td>
+                    <td className="px-4 py-3 text-white/80">
+                      {o.filledPrice == null ? "—" : `$${String(o.filledPrice)}`}
+                    </td>
+                    <td className="px-4 py-3 text-white/70">{formatDate(o.createdAt)}</td>
                   </tr>
                 ))
               )}
