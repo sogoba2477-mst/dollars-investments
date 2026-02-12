@@ -1,64 +1,105 @@
+import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { ensureWallet } from "@/lib/paper/wallet";
+
+const STARTING_CASH = 50000;
+
+function n(v: any) {
+  const x = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(x) ? x : 0;
+}
+
+function money(v: number) {
+  return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(v);
+}
 
 export default async function AppHome() {
   const session = await getServerSession(authOptions);
+  if (!session?.user?.email) redirect("/login?callbackUrl=/app");
 
-  const email = session?.user?.email ?? null;
-  const user = email ? await prisma.user.findUnique({ where: { email } }) : null;
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    select: { id: true, email: true },
+  });
 
-  let cash: string | null = null;
-  let positionsCount: number | null = null;
-  let ordersCount: number | null = null;
+  if (!user?.id) redirect("/login?callbackUrl=/app");
 
-  if (user) {
-    const wallet = await ensureWallet(user.id);
-    cash = wallet.cash.toString();
+  // Ensure initial paper deposit exists (idempotent)
+  const existingDeposit = await prisma.transaction.findFirst({
+    where: { userId: user.id, kind: "PAPER_DEPOSIT" },
+    select: { id: true },
+  });
 
-    const trades = await prisma.paperTrade.findMany({
-      where: { userId: user.id },
-      select: { symbol: true, side: true, qty: true },
+  if (!existingDeposit) {
+    await prisma.transaction.create({
+      data: {
+        userId: user.id,
+        kind: "PAPER_DEPOSIT",
+        amount: STARTING_CASH,
+        meta: { note: "Initial paper deposit" },
+      },
     });
-
-    const map = new Map<string, number>();
-    for (const t of trades) {
-      const prev = map.get(t.symbol) ?? 0;
-      const q = Number(t.qty);
-      map.set(t.symbol, t.side === "buy" ? prev + q : prev - q);
-    }
-    positionsCount = Array.from(map.values()).filter((q) => Math.abs(q) > 0).length;
-
-    ordersCount = await prisma.paperOrder.count({ where: { userId: user.id } });
   }
+
+  // Cash impact from filled orders (uses filledAvgPrice)
+  const filledOrders = await prisma.order.findMany({
+    where: { userId: user.id, status: "filled" },
+    select: { side: true, qty: true, filledAvgPrice: true },
+  });
+
+  let cashDelta = 0;
+  for (const o of filledOrders) {
+    const px = o.filledAvgPrice ? n(o.filledAvgPrice) : 0;
+    const qty = n(o.qty);
+    if (!px || !qty) continue;
+
+    const notional = px * qty;
+    if (o.side === "buy") cashDelta -= notional;
+    if (o.side === "sell") cashDelta += notional;
+  }
+
+  const cash = STARTING_CASH + cashDelta;
+
+  // Positions value from stored avgPrice (simple)
+  const positions = await prisma.position.findMany({
+    where: { userId: user.id },
+    select: { qty: true, avgPrice: true },
+  });
+
+  let positionsValue = 0;
+  for (const p of positions) {
+    positionsValue += n(p.qty) * n(p.avgPrice ?? 0);
+  }
+
+  const portfolio = cash + positionsValue;
+
+  const ordersCount = await prisma.order.count({ where: { userId: user.id } });
+  const positionsCount = await prisma.position.count({ where: { userId: user.id } });
 
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+
       <p className="text-muted-foreground">
-        Signed in as <span className="font-medium">{session?.user?.email ?? "unknown"}</span>
+        Signed in as <span className="font-medium">{user.email}</span>
       </p>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-2xl border p-5">
-          <div className="text-sm font-medium">Cash (paper)</div>
-          <div className="mt-2 text-sm text-muted-foreground">
-            {cash ? `$${cash}` : "—"}
-          </div>
+          <div className="text-sm font-medium">Balance (Paper)</div>
+          <div className="mt-2 text-sm text-muted-foreground">{money(cash)}</div>
         </div>
 
         <div className="rounded-2xl border p-5">
-          <div className="text-sm font-medium">Positions</div>
-          <div className="mt-2 text-sm text-muted-foreground">
-            {positionsCount == null ? "—" : positionsCount}
-          </div>
+          <div className="text-sm font-medium">Portfolio (Paper)</div>
+          <div className="mt-2 text-sm text-muted-foreground">{money(portfolio)}</div>
         </div>
 
         <div className="rounded-2xl border p-5">
-          <div className="text-sm font-medium">Orders</div>
+          <div className="text-sm font-medium">Activity</div>
           <div className="mt-2 text-sm text-muted-foreground">
-            {ordersCount == null ? "—" : ordersCount}
+            {positionsCount} positions · {ordersCount} orders
           </div>
         </div>
       </div>
